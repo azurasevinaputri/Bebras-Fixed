@@ -94,10 +94,8 @@
 
     function openModal(pdfFile, expectedCode, pendampingName) {
         document.getElementById("pdfFileInput").value = pdfFile;
-        document.getElementById("expectedCodeInput").value = expectedCode; // Simpan kode yang benar
+        document.getElementById("expectedCodeInput").value = expectedCode;
         document.getElementById("modal-pendamping-name").textContent = "Pendamping: " + pendampingName;
-        document.getElementById("verificationCode").value = ""; // Kosongkan input user
-        document.getElementById("errorMessage").textContent = ""; // Kosongkan error
         modal.style.display = "block";
     }
 
@@ -105,75 +103,39 @@
         modal.style.display = "none";
     }
 
-    // When the user clicks anywhere outside of the modal, close it
     window.onclick = function(event) {
         if (event.target == modal) {
             closeModal();
         }
     }
 
-    // Handle form submission (Client-Side Verification) - Updated for forced download
+    // Kirim ke verify.php (server-side)
     document.getElementById("verificationForm").addEventListener("submit", function(event) {
-        event.preventDefault(); // Prevent default form submission
+        event.preventDefault();
 
-        const input_code = document.getElementById("verificationCode").value.trim();
-        const expected_code = document.getElementById("expectedCodeInput").value; // Ambil kode yang benar
-        const errorMessageDiv = document.getElementById("errorMessage");
-        const pdfFileToDownload = document.getElementById("pdfFileInput").value;
+        const formData = new FormData();
+        formData.append("pdf_file", document.getElementById("pdfFileInput").value);
+        formData.append("input_code", document.getElementById("verificationCode").value.trim());
+        formData.append("expected_code", document.getElementById("expectedCodeInput").value);
 
-        // Clear previous error
-        errorMessageDiv.textContent = "";
-
-        if (input_code.length !== 4 || isNaN(input_code)) {
-            errorMessageDiv.textContent = "Kode harus berupa 4 digit angka.";
-            return;
-        }
-
-        if (input_code !== expected_code) {
-            errorMessageDiv.textContent = "Kode verifikasi salah.";
-            return;
-        }
-
-        // Jika kode benar, coba unduh file
-        // Membuat URL absolut untuk file PDF
-        const pdfUrl = `pdf_files/${encodeURIComponent(pdfFileToDownload)}`; // encodeURIComponent untuk keamanan nama file
-
-        // Coba trigger download menggunakan fetch dan Blob
-        // Ini lebih andal untuk memaksa download dibanding window.location.href
-        fetch(pdfUrl)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Gagal mengambil file: ${response.status} ${response.statusText}`);
-                }
-                return response.blob(); // Ambil file sebagai Blob
-            })
-            .then(blob => {
-                // Buat URL objek untuk Blob
-                const blobUrl = window.URL.createObjectURL(blob);
-
-                // Buat link sementara untuk Blob
-                const downloadLink = document.createElement('a');
-                downloadLink.href = blobUrl;
-                downloadLink.download = pdfFileToDownload; // Nama file saat diunduh
-
-                // Simulasikan klik pada link download
-                document.body.appendChild(downloadLink);
-                downloadLink.click();
-
-                // Hapus link sementara dan bebaskan URL objek
-                document.body.removeChild(downloadLink);
-                window.URL.revokeObjectURL(blobUrl);
-
-                // Tutup modal setelah download dimulai
-                closeModal();
-            })
-            .catch(error => {
-                console.error('Error saat mengunduh file:', error);
-                errorMessageDiv.textContent = 'Gagal mengunduh file. Silakan coba lagi nanti.';
-            });
-
+        fetch("verify.php", {
+            method: "POST",
+            body: formData
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === "error") {
+                document.getElementById("errorMessage").textContent = data.message;
+            } else {
+                window.location.href = data.download_url;
+            }
+        })
+        .catch(err => {
+            document.getElementById("errorMessage").textContent = "Terjadi kesalahan server.";
+        });
     });
 </script>
+
 
 </body>
 </html>
